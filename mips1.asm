@@ -86,4 +86,5 @@ main:
     
     li $v0,10 #This is to terminate the program
     syscall
+    # test commit
 
