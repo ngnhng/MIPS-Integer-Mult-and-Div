@@ -175,32 +175,10 @@ negative:
 #end negative
 ###################################################################################################################################
 _mul:
-	li $s3, 0        # lw product
-   	li $s4, 0        # hw product
-   	beq $a0, $0, done
-    	beq $a1, $0, done
-    	li $s2, 0        # extend multiplicand to 64 bits
 
-	loop:
-    		andi $t0, $a1, 1    # get LSB of multiplier
-   		beq $t0, $0, next   # skip if even
-    		addu $s3, $s3, $a0  # lw(product) += lw(multiplicand)
-    		sltu $t0, $s3, $a0  # catch carry-out(0 or 1)
-    		addu $s4, $s4, $t0  # hw(product) += carry
-    		addu $s4, $s4, $a1  # hw(product) += hw(multiplicand)
-	next:
-    
-    		# shift multiplicand left
-    		srl $t0, $a0, 31    # copy bit from lw to hw
-    		sll $a0, $a0, 1
-    		sll $a1, $a1, 1
-    		addu $a1, $a1, $t0
-
-    		srl $s0, $a0, 1     # shift multiplier right
-    		bne $a0, $0, loop
-
-	done:
     		jr $ra
 	
 ###################################################################################################################################
 _div:
+		
+		jr $ra
