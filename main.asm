@@ -93,7 +93,7 @@ goto_div:
 get_user_input:
 	#returns op1 in $v0, 
 		#op2 in $v1,
-		#op  in $a0 (3 mult, 4 div)
+		#op  in $a0 
 	
 	print("Operand 1:\t")
 	li $v0, 5		#get op1
