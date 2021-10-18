@@ -159,9 +159,9 @@ get_sign:
 ###################################################################################################################################
 get_abs:
 
-	sra $t0,$a0,31   
-	xor $a0,$a0,$t0   
-	sub $a0,$a0,$t0
+	sra $t0,$a0,31       # t0 is filled with sign bit of a0 - 0xFFFFFFFF or 0x0000000
+	xor $a0,$a0,$t0      # each bit of a0 is inverted if t0 = 0xFFFFFFF aka negative
+	sub $a0,$a0,$t0      # if t0 is 0xFFFFFFF then a0 = (a0 ^ 0xFFFFFFFF) - 0xFFFFFFF = -a0
 	li  $t0, 0
 	
 	jr $ra
