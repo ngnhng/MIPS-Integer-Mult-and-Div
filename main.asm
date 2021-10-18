@@ -177,27 +177,27 @@ negative:
 _mul:
 	li $s3, 0        # lw product
    	li $s4, 0        # hw product
-   	beq $s1, $0, done
-    	beq $s0, $0, done
+   	beq $a0, $0, done
+    	beq $a1, $0, done
     	li $s2, 0        # extend multiplicand to 64 bits
 
 	loop:
-    		andi $t0, $s0, 1    # get LSB of multiplier
+    		andi $t0, $a1, 1    # get LSB of multiplier
    		beq $t0, $0, next   # skip if even
-    		addu $s3, $s3, $s1  # lw(product) += lw(multiplicand)
-    		sltu $t0, $s3, $s1  # catch carry-out(0 or 1)
+    		addu $s3, $s3, $a0  # lw(product) += lw(multiplicand)
+    		sltu $t0, $s3, $a0  # catch carry-out(0 or 1)
     		addu $s4, $s4, $t0  # hw(product) += carry
-    		addu $s4, $s4, $s2  # hw(product) += hw(multiplicand)
+    		addu $s4, $s4, $a1  # hw(product) += hw(multiplicand)
 	next:
     
     		# shift multiplicand left
-    		srl $t0, $s1, 31    # copy bit from lw to hw
-    		sll $s1, $s1, 1
-    		sll $s2, $s2, 1
-    		addu $s2, $s2, $t0
+    		srl $t0, $a0, 31    # copy bit from lw to hw
+    		sll $a0, $a0, 1
+    		sll $a1, $a1, 1
+    		addu $a1, $a1, $t0
 
-    		srl $s0, $s0, 1     # shift multiplier right
-    		bne $s0, $0, loop
+    		srl $s0, $a0, 1     # shift multiplier right
+    		bne $a0, $0, loop
 
 	done:
     		jr $ra
