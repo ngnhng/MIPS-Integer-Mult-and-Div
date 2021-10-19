@@ -89,7 +89,10 @@ main:
 goto_mul: 
 	
 	jal _mul             #return a1 (lo) and a2(hi)
-	print_int32($a1)
+	la $a0, ($s4)     #SIGN
+	jal negate      # negate if SIGN = 1
+	
+	print_int32($a1)    
 	ptab
 	print_int32($a2)
 	
@@ -101,8 +104,6 @@ goto_div:
 	
 	j main_exit
 	# ...
-	
-	
 	
 main_exit:
 
@@ -234,3 +235,11 @@ _mul:
 _div:
 		
 		jr $ra
+###################################################################################################################################
+negate:
+	bne $a0, 1, negate_exit
+	subu $a1, $zero, $a1
+	subu $a2, $zero, $a2
+	negate_exit:	
+		jr $ra
+###################################################################################################################################
