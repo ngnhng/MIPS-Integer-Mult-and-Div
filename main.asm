@@ -4,8 +4,16 @@
 	op_input_buffer: .space  2
 	
 .macro endl
+	
 	li $v0, 4
 	la $a0, newline
+	syscall
+.end_macro
+
+.macro ptab
+	
+	li $v0, 4
+	la $a0, tab
 	syscall
 .end_macro
 
@@ -17,6 +25,13 @@
 		la $a0, str_
 		syscall
 .end_macro
+
+.macro print_int32 (%x)
+	li  $v0, 1
+	add $a0, $zero, %x
+	syscall
+.end_macro
+
 .text
 
 main:
@@ -73,18 +88,25 @@ main:
 	
 goto_mul: 
 	
-	jal _mul
+	jal _mul             #return a1 (lo) and a2(hi)
+	print_int32($a1)
+	ptab
+	print_int32($a2)
 	
+	j main_exit
 	
 goto_div:
 	
 	jal _div
 	
+	j main_exit
 	# ...
 	
 	
 	
-	
+main_exit:
+
+	print("\n")
 	li $v0, 10
 	syscall
 	
@@ -100,7 +122,7 @@ get_user_input:
 	syscall
 	move $t0, $v0		#store op1 in $t0
 	
-	get_operand:
+	get_oper8:
 		print("Operator:\t")
 	
 		li $v0, 8		#get op character
@@ -118,7 +140,7 @@ get_user_input:
 	
 		#print bad character string
 		print("ONLY '*', AND '/' ARE ALLOWED\n")
-		j get_operand       # retry
+		j get_oper8       # retry
 	
 	code_mul:
 		li $t1, 0
@@ -156,13 +178,12 @@ get_sign:
 
 	jr $ra 
 #end get_sign
-###################################################################################################################################
+####################################################################################################################################
 get_abs:
 
 	sra $t0,$a0,31       # t0 is filled with sign bit of a0 - 0xFFFFFFFF or 0x0000000
 	xor $a0,$a0,$t0      # each bit of a0 is inverted if t0 = 0xFFFFFFF aka negative
 	sub $a0,$a0,$t0      # if t0 is 0xFFFFFFF then a0 = (a0 ^ 0xFFFFFFFF) - 0xFFFFFFF = -a0
-	li  $t0, 0
 	
 	jr $ra
 #end get_abs
@@ -173,8 +194,9 @@ negative:
 	
 	jr $ra
 #end negative
-###################################################################################################################################
-_mul:
+####################################################################################################################################
+_mul:  
+	#dealing with unsigned int32
 	li $s0, 0        # lw product
    	li $s1, 0        # hw product
    	
@@ -183,19 +205,20 @@ _mul:
     	li $s2, 0        # extend multiplicand to 64 bits
 
 	loop:
+	
     		andi $t0, $a1, 1    # get LSB of multiplier
    		beq $t0, $0, next   # skip if even
-   		
+   		# use addu to avoid exceptions
     		addu $s0, $s0, $a0  # lw(product) += lw(multiplicand)
-    		sltu $t0, $s0, $a0  # catch carry-out(0 or 1)
+    		sltu $t0, $s0, $a0  # catch carry-out(0 or 1)    (s0 < a0)
     		
-    		addu $s1, $s1, $t0  # hw(product) += carry
+    		addu $s1, $s1, $t0  # hw(product) += carry     
     		addu $s1, $s1, $s2  # hw(product) += hw(multiplicand)
 	next:
     
-    		# shift multiplicand left
+    		
     		srl $t0, $a0, 31    # copy bit from lw to hw
-    		sll $a0, $a0, 1
+    		sll $a0, $a0, 1     # shift multiplicand left
     		sll $s2, $s2, 1
     		addu $s2, $s2, $t0
 
@@ -203,8 +226,9 @@ _mul:
     		bne $a1, $zero, loop
 
 	done:
-	
-		j $ra
+		la $a1, ($s0)
+		la $a2, ($s1)
+		jr $ra
 	
 ###################################################################################################################################
 _div:
