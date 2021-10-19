@@ -26,7 +26,7 @@
 		syscall
 .end_macro
 
-.macro print_int32 (%x)
+.macro print_int32 (%x)   # avoid using v0 as input
 	li  $v0, 1
 	add $a0, $zero, %x
 	syscall
@@ -75,13 +75,6 @@ main:
 	la $a0, ($s5)       # op1
 	la $a1, ($s6)       # op2 
 	
-	#clear registers
-	li $s0, 0
-	li $s1, 0
-	li $s3, 0
-	li $s5, 0
-	li $s6, 0
-	
 	#call operations
 	beq $t0, 0, goto_mul       # if 0 then multiply 
 	beq $t0, 1, goto_div       # else if 1 divide
@@ -124,6 +117,7 @@ get_user_input:
 	move $t0, $v0		#store op1 in $t0
 	
 	get_oper8:
+	
 		print("Operator:\t")
 	
 		li $v0, 8		#get op character
@@ -201,8 +195,8 @@ _mul:
 	li $s0, 0        # lw product
    	li $s1, 0        # hw product
    	
-   	beq $a0, $zero, done
-    	beq $a1, $zero, done
+   	beq $a0, $zero, mul_exit
+    	beq $a1, $zero, mul_exit
     	li $s2, 0        # extend multiplicand to 64 bits
 
 	loop:
@@ -216,7 +210,6 @@ _mul:
     		addu $s1, $s1, $t0  # hw(product) += carry     
     		addu $s1, $s1, $s2  # hw(product) += hw(multiplicand)
 	next:
-    
     		
     		srl $t0, $a0, 31    # copy bit from lw to hw
     		sll $a0, $a0, 1     # shift multiplicand left
@@ -226,9 +219,9 @@ _mul:
     		srl $a1, $a1, 1     # shift multiplier right
     		bne $a1, $zero, loop
 
-	done:
-		la $a1, ($s0)
-		la $a2, ($s1)
+	mul_exit:
+		la $a1, ($s0)	#lo
+		la $a2, ($s1) #hi
 		jr $ra
 	
 ###################################################################################################################################
@@ -237,9 +230,11 @@ _div:
 		jr $ra
 ###################################################################################################################################
 negate:
+
 	bne $a0, 1, negate_exit
 	subu $a1, $zero, $a1
 	subu $a2, $zero, $a2
 	negate_exit:	
+	
 		jr $ra
 ###################################################################################################################################
