@@ -26,7 +26,7 @@
 		syscall
 .end_macro
 
-.macro print_int32 (%x)   # avoid using v0 as input
+.macro print_int32 (%x)   # avoid passing v0
 	li  $v0, 1
 	add $a0, $zero, %x
 	syscall
@@ -216,35 +216,58 @@ _mul:
 		jr $ra
     	
 ###################################################################################################################################
-_div:
-
-	la $s0, ($a0)   # remainder = dividend
-	la $s1, ($a1)	  # divisor
-	li $s2, 0       # counter
+_div:  
+	# || REMAINDER | QUOTIENT ||  --> || REMAINDER_upper | REMAINDER_lower||
+       # Remainder and Quotient constitute two halves of a 64-bit register
+       # Solution:
+       	# USE TWO 32-BIT REGISTERS
+       	# DEFINE A SUBROUTINE FOR SHIFTING BETWEEN TWO REGS
+         
+	la $s0, ($a0)   # REMAINDER_lower = DIVIDEND
+	la $s1, ($a1)	  # DIVISOR
+	li $s2, 0       # COUNTER
+	li $s3, 0	  # REMAINDER_upper extension
 	
-	sll $s0, $s0, 1   # initial REM shift left 
+	# initial - REMAINDER shift left SUBROUTINE
+	
+	andi $t0, $s0, 0x80000000     #get MSB
+	srl $t0, $t0, 31
+	sll $s3, $s3, 1               # shift left upper if needed
+	addu $s3, $s3, $t0            # 
+	sll $s0, $s0, 1               # complete the initial shift left
 	
 	div_loop:
 	
-		bge $s2, 16, div_exit   
-		srl $t0, $s0, 16       # left half of REM
-		sub $t0, $t0, $s1      # REM = REM - divisor
+		bge $s2, 32, div_exit  # loop 32 times for 32-bit division
 		
-		bge $t0, 0, p          # if REM >=0 then branch
-		sll $s0, $s0, 1        # 
+		la $t0, ($s3)          # t0 = REMAINDER_upper  -> RESTORE REMAINDER_upper
+		sub $t0, $t0, $s1      # REMAINDER_upper = REMAINDER_upper - DIVISOR
+		
+		# IF REMAINDER_upper >=0 then branch
+		bge $t0, 0, sll_rem   
+		
+		# ELSE
+		# boilerplate code but idc
+		andi $t0, $s0, 0x80000000     #get MSB 
+		srl $t0, $t0, 31
+		sll $s3, $s3, 1               # shift left upper if needed
+		addu $s3, $s3, $t0            
+		sll $s0, $s0, 1
 		
 		j cont
 		
-	p:
-		sll $s0, $s0, 16
-		srl $s0, $s0, 16
+	sll_rem:
+	
+		la $s3, ($t0)
 		
+		# boilerplate code but idc
+		andi $t0, $s0, 0x80000000     #get MSB 
+		srl $t0, $t0, 31
+		sll $s3, $s3, 1               # shift left upper if needed
+		addu $s3, $s3, $t0            
+		sll $s0, $s0, 1
 		
-		sll $t0, $t0, 16
-		addu $s0, $s0, $t0
-		
-		sll $s0, $s0, 1        # shift left REM
-		addi $s0, $s0, 1       # set LSB to 1 
+		addi $s0, $s0, 1      	 # set LSB of lower to 1 
 		
 	cont:
 	
@@ -253,9 +276,9 @@ _div:
 		
 	div_exit:
 		
-		andi $a1, $s0, 0x0000FFFF   # quotient
-		andi $a2, $s0, 0xFFFF0000   # remainder
-		srl $a2, $a2, 17
+		la $a1, ($s0)   # quotient
+		la $a2, ($s3)   # remainder
+		srl $a2, $a2, 1
 		
 		jr $ra
 ###################################################################################################################################
