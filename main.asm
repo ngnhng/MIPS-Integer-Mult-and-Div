@@ -57,13 +57,8 @@ main:
 	la $s4, ($v0)
 		
 	#get abs()
-	la $a0, ($s0)
-	jal get_abs           #return a0 = abs(x)
-	la $s5, ($a0)
-	
-	la $a0, ($s3)
-	jal get_abs           #return a0 = abs(x)
-	la $s6, ($a0)        
+	abs $s5, $s0
+	abs $s6, $s3        
 	
 	addi $sp, $sp, -16
 	sw   $s5, 12($sp)	#op1
@@ -95,8 +90,11 @@ goto_div:
 	
 	jal _div
 	
+	print_int32($a1)    
+	ptab
+	print_int32($a2)
+		
 	j main_exit
-	# ...
 	
 main_exit:
 
@@ -174,15 +172,6 @@ get_sign:
 	jr $ra 
 #end get_sign
 ####################################################################################################################################
-get_abs:
-
-	sra $t0,$a0,31       # t0 is filled with sign bit of a0 - 0xFFFFFFFF or 0x0000000
-	xor $a0,$a0,$t0      # each bit of a0 is inverted if t0 = 0xFFFFFFF aka negative
-	sub $a0,$a0,$t0      # if t0 is 0xFFFFFFF then a0 = (a0 ^ 0xFFFFFFFF) - 0xFFFFFFF = -a0
-	
-	jr $ra
-#end get_abs
-####################################################################################################################################
 negative:
 	
 	li $v0, 1
@@ -199,7 +188,7 @@ _mul:
     	beq $a1, $zero, mul_exit
     	li $s2, 0        # extend multiplicand to 64 bits
 
-	loop:
+	mul_loop:
 	
     		andi $t0, $a1, 1    # get LSB of multiplier
    		beq $t0, $0, next   # skip if even
@@ -209,6 +198,7 @@ _mul:
     		
     		addu $s1, $s1, $t0  # hw(product) += carry     
     		addu $s1, $s1, $s2  # hw(product) += hw(multiplicand)
+    		
 	next:
     		
     		srl $t0, $a0, 31    # copy bit from lw to hw
@@ -217,15 +207,55 @@ _mul:
     		addu $s2, $s2, $t0
 
     		srl $a1, $a1, 1     # shift multiplier right
-    		bne $a1, $zero, loop
+    		bne $a1, $zero, mul_loop
 
 	mul_exit:
 		la $a1, ($s0)	#lo
 		la $a2, ($s1) #hi
+		
 		jr $ra
-	
+    	
 ###################################################################################################################################
 _div:
+
+	la $s0, ($a0)   # remainder = dividend
+	la $s1, ($a1)	  # divisor
+	li $s2, 0       # counter
+	
+	sll $s0, $s0, 1   # initial REM shift left 
+	
+	div_loop:
+	
+		bge $s2, 16, div_exit   
+		srl $t0, $s0, 16       # left half of REM
+		sub $t0, $t0, $s1      # REM = REM - divisor
+		
+		bge $t0, 0, p          # if REM >=0 then branch
+		sll $s0, $s0, 1        # 
+		
+		j cont
+		
+	p:
+		sll $s0, $s0, 16
+		srl $s0, $s0, 16
+		
+		
+		sll $t0, $t0, 16
+		addu $s0, $s0, $t0
+		
+		sll $s0, $s0, 1        # shift left REM
+		addi $s0, $s0, 1       # set LSB to 1 
+		
+	cont:
+	
+		addi $s2, $s2, 1
+		j div_loop
+		
+	div_exit:
+		
+		andi $a1, $s0, 0x0000FFFF   # quotient
+		andi $a2, $s0, 0xFFFF0000   # remainder
+		srl $a2, $a2, 17
 		
 		jr $ra
 ###################################################################################################################################
