@@ -1,8 +1,17 @@
-.data     #TODO: rewrite macros 
+# HO CHI MINH UNIVERSITY OF TECHNOLOGY
+
+# COMPUTER ARCHITECTURE 211 ASSIGNMENT
+# IMPLEMENTATION OF 32-BIT INTEGER MULTIPLICATION AND DIVISION
+# by NGUYEN NHAT NGUYEN - HUYNH TUAN KIET - LY THANH HUNG
+
+
+.data  # put .word data first to avoid boundary issues
+	
 	newline: .asciiz 	"\n"
 	tab: .asciiz		"\t"
-	op_input_buffer: .space  2
+	input_buffer: .space  2
 	
+# AVOID BOILERPLATE CODE BY DEFINING MACRO INSTRUCTIONS FOR SMALL TASKS
 .macro endl
 	
 	li $v0, 4
@@ -17,7 +26,8 @@
 	syscall
 .end_macro
 
-.macro print (%str)
+.macro print_string (%str)
+
 	.data	
 		str_:	.asciiz	%str
 	.text
@@ -27,6 +37,7 @@
 .end_macro
 
 .macro print_int32 (%x)   # avoid passing v0
+
 	li  $v0, 1
 	add $a0, $zero, %x
 	syscall
@@ -35,14 +46,14 @@
 .text
 
 main:
-	print("\n\n\n NEW RUN:\n\n")
+	print_string("\n\n\n NEW RUN:\n\n")
 	jal get_user_input  		# return v0, a0, v1 (op1, op, op2)
 	 
 	la $s0, ($v0)
 	la $t0, ($a0)
 	la $s3, ($v1)	
 	
-	#get sign of op1          #TODO: consider branch for division of 0s
+	#get sign of op1          #TODO: consider branch for division of 0
 	la $a0, ($s0)
 	jal get_sign			#return v0 - sign bit
 	la $t1, ($v0)
@@ -76,9 +87,9 @@ main:
 	
 goto_mul: 
 	
-	jal _mul             #return a1 (lo) and a2(hi)
-	la $a0, ($s4)     #SIGN
-	jal negate      # negate if SIGN = 1
+	jal _mul             # return a1 (lo) and a2(hi)
+	la $a0, ($s4)        # get SIGN
+	jal negate           # negate if SIGN = 1
 	
 	print_int32($a1)    
 	ptab
@@ -88,7 +99,7 @@ goto_mul:
 	
 goto_div:
 	
-	jal _div
+	jal _div             # return a1 (quotient) and a2(remainder)
 	
 	print_int32($a1)    
 	ptab
@@ -98,41 +109,36 @@ goto_div:
 	
 main_exit:
 
-	print("\n")
 	li $v0, 10
 	syscall
 	
 	
 ####################################################################################################################################	
 get_user_input:
-	#returns op1 in $v0, 
-		#op2 in $v1,
-		#op  in $a0 
 	
-	print("Operand 1:\t")
+	print_string("Operand 1:\t")
 	li $v0, 5		#get op1
 	syscall
 	move $t0, $v0		#store op1 in $t0
 	
 	get_oper8:
 	
-		print("Operator:\t")
+		print_string("Operator ('*' or '/'):\t")
 	
 		li $v0, 8		#get op character
-		la $a0, op_input_buffer
-		li $a1, 2
+		la $a0, input_buffer
+		li $a1, 2            # one for char and one for \0
 		syscall		
-		endl		
-	
-		la  $t3, op_input_buffer	#temporarily get start address for character input
-		lb  $t3, 0($t3)			#get ASCII code for character entered
+		endl
+		la $t3, input_buffer # load buffer		
+		lb $t3, 0($t3)       # get the ascii code
 	
 		#branching
 		beq $t3, 0x2A, code_mul       #42 ascii
 		beq $t3, 0x2F, code_div       #47 ascii
 	
 		#print bad character string
-		print("ONLY '*', AND '/' ARE ALLOWED\n")
+		print_string("ONLY '*', AND '/' ARE ALLOWED\n")
 		j get_oper8       # retry
 	
 	code_mul:
@@ -144,7 +150,7 @@ get_user_input:
 	
 	valid_operand:
 	
-		print("Operand 2:\t")
+		print_string("Operand 2:\t")
 		li $v0, 5		#get op2
 		syscall
 		move $t2, $v0		#store op2 in $t0
@@ -278,7 +284,7 @@ _div:
 		
 		la $a1, ($s0)   # quotient
 		la $a2, ($s3)   # remainder
-		srl $a2, $a2, 1
+		srl $a2, $a2, 1  # final shift right
 		
 		jr $ra
 ###################################################################################################################################
