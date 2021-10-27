@@ -97,10 +97,10 @@ main:
 goto_mul: 
 	
 	jal _mul             # return a1 (lo) and a2(hi)
-	la $a0, ($s4)        # get SIGN
-	jal negate           # negate if SIGN = 1
+#	la $a0, ($s4)        # get SIGN
+#	jal negate           # negate if SIGN = 1
 	
-	jal print_result
+	jal print_mul_result
 	
 	j main_exit
 	
@@ -108,7 +108,7 @@ goto_div:
 	
 	jal _div             # return a1 (quotient) and a2(remainder)	
 	
-	jal print_result
+	jal print_div_result
 	
 main_exit:	
 	li $v0, 10
@@ -310,7 +310,53 @@ negate:
 	
 		jr $ra
 ###################################################################################################################################
-print_result:
+print_mul_result:
+
+	la $t0, ($a1)
+	la $t1, ($a2)
+	
+	print_string("Choose display mode (D/H/B): ")
+	li $v0, 8		#get op character
+	la $a0, input_buffer
+	li $a1, 2            # one for char and one for \0
+	syscall		
+	endl
+	la $t2, input_buffer # load buffer		
+	lb $t2, 0($t2)       # get the ascii code
+	
+	#branching
+	beq $t2, 0x44, decm
+	beq $t2, 0x48, hexm
+	beq $t2, 0x42, binm
+	
+	decm:                      # return nothing
+		print_string("lo: ")
+		print_int32($t0)
+		endl
+		print_string("hi: ")
+		print_int32($t1)
+		
+		jr $ra
+	hexm:
+		print_string("lo: ")
+		print_hex($t0)
+		endl
+		print_string("hi: ")
+		print_hex($t1)
+		
+		jr $ra
+	binm:
+		print_string("lo: ")
+		print_bin($t0)
+		endl
+		print_string("hi: ")
+		print_bin($t1)
+		
+		jr $ra
+	
+	
+###################################################################################################################################
+print_div_result:
 	
 	la $t0, ($a1)
 	la $t1, ($a2)
@@ -330,20 +376,26 @@ print_result:
 	beq $t2, 0x42, bin
 	
 	dec:                      # return nothing
+		print_string("Quotient: ")
 		print_int32($t0)
-		ptab
+		endl
+		print_string("Remainder: ")
 		print_int32($t1)
 		
 		jr $ra
 	hex:
+		print_string("Quotient: ")
 		print_hex($t0)
-		ptab
+		endl
+		print_string("Remainder: ")
 		print_hex($t1)
 		
 		jr $ra
 	bin:
+		print_string("Quotient: ")
 		print_bin($t0)
-		ptab
+		endl
+		print_string("Remainder: ")
 		print_bin($t1)
 		
 		jr $ra
