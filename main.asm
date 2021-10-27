@@ -94,28 +94,49 @@ goto_mul:
 	la $a0, ($s4)        # get SIGN
 	jal negate           # negate if SIGN = 1
 	
-	print_int32($a1)    
-	ptab
-	print_int32($a2)
-	
-	j main_exit
+	j subroutine
 	
 goto_div:
 	
-	jal _div             # return a1 (quotient) and a2(remainder)
+	jal _div             # return a1 (quotient) and a2(remainder)	
 	
+	j subroutine
+
+subroutine:
+	print_string("Which representation that you choose?\n")
+	print_string("Decimal: enter 1\n")
+	print_string("Binary: enter 2\n")
+	print_string("hexadecimal: enter 3\n")
+	print_string("Result:\n")
+	li $v0,5
+	syscall
+	beq $v0,2,binary
+	beq $v0,3,hexa
 	print_int32($a1)    
 	ptab
 	print_int32($a2)
-		
 	j main_exit
-	
-main_exit:
-
-	li $v0, 10
+binary:
+	add $a0,$zero,$a1
+	li $v0,35
 	syscall
-	
-	
+	ptab
+	add $a0,$zero,$a2
+	li $v0,35
+	syscall
+	j main_exit
+hexa:
+	add $a0,$zero,$a1
+	li $v0,34
+	syscall
+	ptab
+	add $a0,$zero,$a2
+	li $v0,34
+	syscall
+	j main_exit
+main_exit:	
+	li $v0, 10
+	syscall	
 ####################################################################################################################################	
 get_user_input:
 	
@@ -156,6 +177,7 @@ get_user_input:
 		print_string("Operand 2:\t")
 		li $v0, 5		#get op2
 		syscall
+		beq $v0,0,loi
 		move $t2, $v0		#store op2 in $t0
 
 		#store return values
@@ -170,7 +192,11 @@ get_user_input:
 		li $t3, 0
 	
 		jr $ra	
-
+	loi:
+		print_string("We cannot devide by zero\n")
+		print_string("Please enter another divisor\n")
+		j valid_oper8
+		 
 ####################################################################################################################################
 get_sign:
 
@@ -237,7 +263,7 @@ _div:
        # Solution:
        	# USE TWO 32-BIT REGISTERS
        	# DEFINE A METHOD FOR SHIFTING BETWEEN TWO REGS
-         
+        beq $a1,$zero,loi 
 	la $s0, ($a0)   # REMAINDER_lower = DIVIDEND
 	la $s1, ($a1)	  # DIVISOR
 	li $s2, 0       # COUNTER
@@ -296,6 +322,7 @@ _div:
 		srl $a2, $a2, 1  # final shift right
 		
 		jr $ra
+	
 ###################################################################################################################################
 negate:
 
