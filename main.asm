@@ -1,7 +1,7 @@
 # HO CHI MINH UNIVERSITY OF TECHNOLOGY
 
 # COMPUTER ARCHITECTURE 211 ASSIGNMENT
-# IMPLEMENTATION OF 32-BIT INTEGER MULTIPLICATION AND DIVISION
+# IMPLEMENTATION OF 32-BIT INTEGER MULTIPLICATION AND DIVISION IN MIPS
 # by NGUYEN NHAT NGUYEN - HUYNH TUAN KIET - LY THANH HUNG
 
 
@@ -11,12 +11,13 @@
 	tab: .asciiz		"\t"
 	input_buffer: .space  2
 	
-# AVOID BOILERPLATE CODE BY DEFINING MACRO INSTRUCTIONS FOR SMALL TASKS
+# AVOID BOILERPLATE CODE BY DEFINING MACROS FOR REPETITIVE TASKS
 .macro endl
 	
 	li $v0, 4
 	la $a0, newline
 	syscall
+	
 .end_macro
 
 .macro ptab
@@ -24,6 +25,7 @@
 	li $v0, 4
 	la $a0, tab
 	syscall
+	
 .end_macro
 
 .macro print_string (%str)
@@ -41,6 +43,7 @@
 	li  $v0, 1
 	add $a0, $zero, %x
 	syscall
+	
 .end_macro
 
 .text
@@ -143,12 +146,12 @@ get_user_input:
 	
 	code_mul:
 		li $t1, 0
-		j valid_operand
+		j valid_oper8
 	code_div:
 		li $t1, 1
-		j valid_operand
+		j valid_oper8
 	
-	valid_operand:
+	valid_oper8:
 	
 		print_string("Operand 2:\t")
 		li $v0, 5		#get op2
@@ -167,39 +170,45 @@ get_user_input:
 		li $t3, 0
 	
 		jr $ra	
-#end input
 
 ####################################################################################################################################
 get_sign:
 
-	andi $v0, $a0, 0x80000000	#clear all bits except for sign bit - aka 10000000000000000000000000000000
+	andi $v0, $a0, 0x80000000	# GET MSB
 	srl  $v0, $v0, 31	
 
 	jr $ra 
-#end get_sign
+
 ####################################################################################################################################
 negative:
 	
 	li $v0, 1
 	
 	jr $ra
-#end negative
+
 ####################################################################################################################################
 _mul:  
-	#dealing with unsigned int32
-	li $s0, 0        # lw product
-   	li $s1, 0        # hw product
-   	
-   	beq $a0, $zero, mul_exit
-    	beq $a1, $zero, mul_exit
-    	li $s2, 0        # extend multiplicand to 64 bits
+	# THE PRODUCT AND MULTIPLICAND MAY OVERFLOW DUE TO SHIFTING LEFT
+	# Solution:
+		# USE TWO 32-BIT REGISTERS FOR HI AND LO, SIMILAR TO THE BASE MULT, MULTU INSTRUCTIONS.
+		# DEFINE A SUBROUTINE TO DISPLAY THE RESULT FROM BOTH HI AND LO REGS COMBINED.
+		
+   	# if 0 occurs then quick exit
+   	beq $a0, $zero, mul_exit     # MULTIPLICAND
+    	beq $a1, $zero, mul_exit     # MULTIPLIER
+    	
+    	li $s0, 0        # lo reg of PRODUCT
+   	li $s1, 0        # hi reg of PRODUCT
+    	li $s2, 0        # multiplicand expansion
 
 	mul_loop:
 	
-    		andi $t0, $a1, 1    # get LSB of multiplier
-   		beq $t0, $0, next   # skip if even
+    		andi $t0, $a1, 1    # get LSB of MULTIPLIER
+   		beq $t0, $0, next   # IF t0 is even then branch
+   		
+   		# ELSE
    		# use addu to avoid exceptions
-    		addu $s0, $s0, $a0  # lw(product) += lw(multiplicand)
+    		addu $s0, $s0, $a0  # PRODUCT_lo += MULTIPLICAND_lo
     		sltu $t0, $s0, $a0  # catch carry-out(0 or 1)    (s0 < a0)
     		
     		addu $s1, $s1, $t0  # hw(product) += carry     
@@ -227,19 +236,19 @@ _div:
        # Remainder and Quotient constitute two halves of a 64-bit register
        # Solution:
        	# USE TWO 32-BIT REGISTERS
-       	# DEFINE A SUBROUTINE FOR SHIFTING BETWEEN TWO REGS
+       	# DEFINE A METHOD FOR SHIFTING BETWEEN TWO REGS
          
 	la $s0, ($a0)   # REMAINDER_lower = DIVIDEND
 	la $s1, ($a1)	  # DIVISOR
 	li $s2, 0       # COUNTER
 	li $s3, 0	  # REMAINDER_upper extension
 	
-	# initial - REMAINDER shift left SUBROUTINE
+	# initial - REMAINDER shift left
 	
-	andi $t0, $s0, 0x80000000     #get MSB
-	srl $t0, $t0, 31
+	andi $t0, $s0, 0x80000000     # get MSB of REMAINDER_lower
+	srl $t0, $t0, 31              # t0 is temporary REMAINDER_upper
 	sll $s3, $s3, 1               # shift left upper if needed
-	addu $s3, $s3, $t0            # 
+	addu $s3, $s3, $t0            # s3 is the actual REMAINDER_upper 
 	sll $s0, $s0, 1               # complete the initial shift left
 	
 	div_loop:
