@@ -13,19 +13,15 @@
 	
 # AVOID BOILERPLATE CODE BY DEFINING MACROS FOR REPETITIVE TASKS
 .macro endl
-	
 	li $v0, 4
 	la $a0, newline
 	syscall
-	
 .end_macro
 
 .macro ptab
-	
 	li $v0, 4
 	la $a0, tab
 	syscall
-	
 .end_macro
 
 .macro print_string (%str)
@@ -39,12 +35,22 @@
 .end_macro
 
 .macro print_int32 (%x)   # avoid passing v0
-
 	li  $v0, 1
 	add $a0, $zero, %x
 	syscall
-	
 .end_macro
+
+.macro print_hex (%x)
+	li  $v0, 34
+	add $a0, $zero, %x
+	syscall
+.end_macro
+
+.macro print_bin (%x)
+	li  $v0, 35
+	add $a0, $zero, %x
+	syscall
+.end_macro	
 
 .text
 
@@ -94,46 +100,16 @@ goto_mul:
 	la $a0, ($s4)        # get SIGN
 	jal negate           # negate if SIGN = 1
 	
-	j subroutine
+	jal print_result
+	
+	j main_exit
 	
 goto_div:
 	
 	jal _div             # return a1 (quotient) and a2(remainder)	
 	
-	j subroutine
-
-subroutine:
-	print_string("Which representation that you choose?\n")
-	print_string("Decimal: enter 1\n")
-	print_string("Binary: enter 2\n")
-	print_string("hexadecimal: enter 3\n")
-	print_string("Result:\n")
-	li $v0,5
-	syscall
-	beq $v0,2,binary
-	beq $v0,3,hexa
-	print_int32($a1)    
-	ptab
-	print_int32($a2)
-	j main_exit
-binary:
-	add $a0,$zero,$a1
-	li $v0,35
-	syscall
-	ptab
-	add $a0,$zero,$a2
-	li $v0,35
-	syscall
-	j main_exit
-hexa:
-	add $a0,$zero,$a1
-	li $v0,34
-	syscall
-	ptab
-	add $a0,$zero,$a2
-	li $v0,34
-	syscall
-	j main_exit
+	jal print_result
+	
 main_exit:	
 	li $v0, 10
 	syscall	
@@ -143,7 +119,7 @@ get_user_input:
 	print_string("Operand 1:\t")
 	li $v0, 5		#get op1
 	syscall
-	move $t0, $v0		#store op1 in $t0
+	add $t0, $zero, $v0		#store op1 in $t0
 	
 	get_oper8:
 	
@@ -177,7 +153,7 @@ get_user_input:
 		print_string("Operand 2:\t")
 		li $v0, 5		#get op2
 		syscall
-		beq $v0,0,loi
+		beq $v0, 0, div_by_0
 		move $t2, $v0		#store op2 in $t0
 
 		#store return values
@@ -192,9 +168,9 @@ get_user_input:
 		li $t3, 0
 	
 		jr $ra	
-	loi:
-		print_string("We cannot devide by zero\n")
-		print_string("Please enter another divisor\n")
+	div_by_0:
+		print_string("\nDividing by Zero is undefined.\n")
+		print_string("Please enter another divisor!\n\n")
 		j valid_oper8
 		 
 ####################################################################################################################################
@@ -263,7 +239,8 @@ _div:
        # Solution:
        	# USE TWO 32-BIT REGISTERS
        	# DEFINE A METHOD FOR SHIFTING BETWEEN TWO REGS
-        beq $a1,$zero,loi 
+        
+       beq $a1, $zero, div_by_0 
 	la $s0, ($a0)   # REMAINDER_lower = DIVIDEND
 	la $s1, ($a1)	  # DIVISOR
 	li $s2, 0       # COUNTER
@@ -331,5 +308,43 @@ negate:
 	subu $a2, $zero, $a2
 	negate_exit:	
 	
+		jr $ra
+###################################################################################################################################
+print_result:
+	
+	la $t0, ($a1)
+	la $t1, ($a2)
+	
+	print_string("Choose display mode (D/H/B): ")
+	li $v0, 8		#get op character
+	la $a0, input_buffer
+	li $a1, 2            # one for char and one for \0
+	syscall		
+	endl
+	la $t2, input_buffer # load buffer		
+	lb $t2, 0($t2)       # get the ascii code
+	
+	#branching
+	beq $t2, 0x44, dec
+	beq $t2, 0x48, hex
+	beq $t2, 0x42, bin
+	
+	dec:                      # return nothing
+		print_int32($t0)
+		ptab
+		print_int32($t1)
+		
+		jr $ra
+	hex:
+		print_hex($t0)
+		ptab
+		print_hex($t1)
+		
+		jr $ra
+	bin:
+		print_bin($t0)
+		ptab
+		print_bin($t1)
+		
 		jr $ra
 ###################################################################################################################################
