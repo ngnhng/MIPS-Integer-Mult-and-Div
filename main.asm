@@ -4,6 +4,7 @@
 # IMPLEMENTATION OF 32-BIT INTEGER MULTIPLICATION AND DIVISION IN MIPS
 # by NGUYEN NHAT NGUYEN - HUYNH TUAN KIET - LY THANH HUNG
 
+#TODO: negative int division / 64 bit int display
 
 .data  # put .word data first to avoid boundary issues
 	
