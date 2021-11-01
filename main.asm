@@ -5,10 +5,9 @@
 # by NGUYEN NHAT NGUYEN - HUYNH TUAN KIET - LY THANH HUNG
 
 
-.data  # put .word data first to avoid boundary issues
+.data  # put .word data first to avoid boundary issues when using lw, sw
 	
 	newline: .asciiz 	"\n"
-	tab: .asciiz		"\t"
 	input_buffer: .space  2
 	
 # AVOID BOILERPLATE CODE BY DEFINING MACROS FOR REPETITIVE TASKS
@@ -18,14 +17,7 @@
 	syscall
 .end_macro
 
-.macro ptab
-	li $v0, 4
-	la $a0, tab
-	syscall
-.end_macro
-
 .macro print_string (%str)
-
 	.data	
 		str_:	.asciiz	%str
 	.text
@@ -34,7 +26,8 @@
 		syscall
 .end_macro
 
-.macro print_int32 (%x)   # avoid passing v0
+# avoid passing v0
+.macro print_int32 (%x)   
 	li  $v0, 1
 	add $a0, $zero, %x
 	syscall
@@ -62,33 +55,26 @@ main:
 	la $t0, ($a0)
 	la $s3, ($v1)	
 	
-	#get sign of op1          #TODO: consider branch for division of 0
-	la $a0, ($s0)
-	jal get_sign			#return v0 - sign bit
-	la $t1, ($v0)
+	srl $t1, $s0, 31      # store sign of op1
+	srl $t2, $s3, 31      # store sign of op2
 	
-	#get sign of op2
-	la $a0, ($s3)
-	jal get_sign			#return v0 - sign bit
-	la $t2, ($v0)
+	# save signs to stack
+	addi $sp, $sp, -8
+	sw   $t1, 4($sp)	
+	sw   $t2, 0($sp)
 	
-	li  $s4, 0                  # SIGN = 0 
-	bne $t1, $t2, negative      # if sign bits are different then SIGN = 1
-	la $s4, ($v0)
-		
+	# clear temp after saving
+	li $t1, 0
+	li $t2, 0      
+	
 	#get abs()
 	abs $s5, $s0
 	abs $s6, $s3        
 	
-	addi $sp, $sp, -16
-	sw   $s5, 12($sp)	#op1
-	sw   $s6, 8($sp)	#op2
-	sw   $t0, 4($sp)	#operator
-	sw   $s4, 0($sp)     # SIGN
-	
 	#load paramaters
 	la $a0, ($s5)       # op1
 	la $a1, ($s6)       # op2 
+	
 	
 	#call operations
 	beq $t0, 0, goto_mul       # if 0 then multiply 
@@ -97,8 +83,14 @@ main:
 goto_mul: 
 	
 	jal _mul             # return a1 (lo) and a2(hi)
-#	la $a0, ($s4)        # get SIGN
-#	jal negate           # negate if SIGN = 1
+	
+	lw $s1, 4($sp)      # load and free stack
+	lw $s2, 0($sp)
+	addi $sp, $sp, 8
+	
+	la $a0, ($s1)
+	la $a3, ($s2)		     
+	jal negate           
 	
 	jal print_mul_result
 	
@@ -108,11 +100,20 @@ goto_div:
 	
 	jal _div             # return a1 (quotient) and a2(remainder)	
 	
+	lw $s1, 4($sp)      # load and free stack
+	lw $s2, 0($sp)
+	addi $sp, $sp, 8
+	
+	la $a0, ($s1)
+	la $a3, ($s2)		 
+	jal negate       # negate according to saved signs
+	
 	jal print_div_result
 	
 main_exit:	
 	li $v0, 10
-	syscall	
+	syscall
+	
 ####################################################################################################################################	
 get_user_input:
 	
@@ -138,7 +139,7 @@ get_user_input:
 		beq $t3, 0x2F, code_div       #47 ascii
 	
 		#print bad character string
-		print_string("ONLY '*', AND '/' ARE ALLOWED\n")
+		print_string("Please enter '*' or '/'\n")
 		j get_oper8       # retry
 	
 	code_mul:
@@ -161,7 +162,7 @@ get_user_input:
 		la $a0, ($t1)		#store op
 		la $v1, ($t2)		#store op2
 	
-		#clear used registers
+		#clear temp registers
 		li $t0, 0
 		li $t1, 0
 		li $t2, 0
@@ -182,13 +183,6 @@ get_sign:
 	jr $ra 
 
 ####################################################################################################################################
-negative:
-	
-	li $v0, 1
-	
-	jr $ra
-
-####################################################################################################################################
 _mul:  
 	# THE PRODUCT AND MULTIPLICAND MAY OVERFLOW DUE TO SHIFTING LEFT
 	# Solution:
@@ -204,28 +198,31 @@ _mul:
     	li $s2, 0        # multiplicand expansion
 
 	mul_loop:
-	
-    		andi $t0, $a1, 1    # get LSB of MULTIPLIER
-   		beq $t0, $0, next   # IF t0 is even then branch
-   		
-   		# ELSE
-   		# use addu to avoid exceptions
-    		addu $s0, $s0, $a0  # PRODUCT_lo += MULTIPLICAND_lo
-    		sltu $t0, $s0, $a0  # catch carry-out(0 or 1)    (s0 < a0)
-    		
-    		addu $s1, $s1, $t0  # hw(product) += carry     
-    		addu $s1, $s1, $s2  # hw(product) += hw(multiplicand)
-    		
-	next:
-    		
-    		srl $t0, $a0, 31    # copy bit from lw to hw
-    		sll $a0, $a0, 1     # shift multiplicand left
-    		sll $s2, $s2, 1
-    		addu $s2, $s2, $t0
-
-    		srl $a1, $a1, 1     # shift multiplier right
-    		bne $a1, $zero, mul_loop
-
+		# check even/oddness of MULTIPLIER
+		andi $t0, $a1, 1      # get LSB
+		beq $t0, 0, mul_cont  # if EVEN then branch
+		
+		# ELSE
+		addu $s0, $s0, $a0    # PROD = PROD + MULTIPLICAND
+		
+		# test whether if PROD can be stored in a 32-bit register
+		sltu $t0, $s0, $a0    # catch carry bit ( occurs when s0 = 0xFFFFFFFF + a0 = s0 + a0, hence s0 < a0)
+		addu $s1, $s1, $t0    # push carry to upper of PRODUCT
+		addu $s1, $s1, $s2    # also add upper MULTIPLICAND
+		
+		mul_cont:
+			# shift left MULTIPLICAND
+			andi $t0, $a0, 0x80000000    # get MSB
+			srl $t0, $t0, 31
+			sll $a0, $a0, 1	    # shift left l?er
+			sll $s2, $s2, 1          # shift left upper
+			addu $s2, $s2, $t0       # push MSB of lower to upper
+			
+			#shift right MULTIPLIER
+			srl $a1, $a1, 1
+			beq $a1, $zero, mul_exit    # if MULTIPLIER == 0 then break
+			j mul_loop
+			
 	mul_exit:
 		la $a1, ($s0)	#lo
 		la $a2, ($s1) #hi
@@ -302,13 +299,30 @@ _div:
 	
 ###################################################################################################################################
 negate:
-
-	bne $a0, 1, negate_exit
+	  # 4 cases : 0-1, 1-0, 1-1 and 0-0 ; the negation varies with each cases
+	sub $t0, $a0, $a3
+	beq $t0, 0, both    # 1-1 and 0-0
+	
+	beq $a0, 1, rem_neg  # 1-0
+	
+	subu $a1, $zero, $a1  # 0-1
+	
+	j negate_exit
+	
+rem_neg:
 	subu $a1, $zero, $a1
 	subu $a2, $zero, $a2
-	negate_exit:	
 	
-		jr $ra
+	j negate_exit
+	
+both: 
+	add $t1, $a0, $a3 
+	beq $t1, 0, negate_exit    # 0-0	
+	subu $a2, $zero, $a2
+	
+negate_exit:	
+	
+	jr $ra
 ###################################################################################################################################
 print_mul_result:
 
