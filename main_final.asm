@@ -49,7 +49,7 @@
 
 main:
 	print_string("\n\n\n NEW RUN:\n\n")
-	jal get_user_input  		# return v0, a0, v1 (op1, op, op2)
+	jal user_input  		# return v0, a0, v1 (op1, op, op2)
 	 
 	la $s0, ($v0)
 	la $t0, ($a0)
@@ -115,7 +115,7 @@ main_exit:
 	syscall
 	
 ####################################################################################################################################	
-get_user_input:
+user_input:
 	
 	print_string("Operand 1:\t")
 	li $v0, 5		#get op1
@@ -173,14 +173,6 @@ get_user_input:
 		print_string("\nDividing by Zero is undefined.\n")
 		print_string("Please enter another divisor!\n\n")
 		j valid_oper8
-		 
-####################################################################################################################################
-get_sign:
-
-	andi $v0, $a0, 0x80000000	# GET MSB
-	srl  $v0, $v0, 31	
-
-	jr $ra 
 
 ####################################################################################################################################
 _mul:  
@@ -205,7 +197,7 @@ _mul:
 		# ELSE
 		addu $s0, $s0, $a0    # PROD = PROD + MULTIPLICAND
 		
-		# test whether if PROD can be stored in a 32-bit register (s0 + a0 <= 2^32 - 1 = 0xFFFFFFFF)
+		# test whether if PROD can be stored in a 32-bit register (s0 + a0 > 2^32 - 1 = 0xFFFFFFFF)
 		sltu $t0, $s0, $a0    # catch carry bit ( occurs when s0 = 0xFFFFFFFF + a0 = s0 + a0, hence s0 < a0)
 		addu $s1, $s1, $t0    # push carry to upper of PRODUCT
 		addu $s1, $s1, $s2    # also add upper MULTIPLICAND
