@@ -247,7 +247,7 @@ _div:
 	
 		bge $s2, 32, div_exit  # loop 32 times for 32-bit division
 		
-		la $t0, ($s3)          # t0 = REMAINDER_upper  -> RESTORE REMAINDER_upper
+		la $t0, ($s3)          # t0 = REMAINDER_upper  -> LOAD INSTEAD OF RESTORING REMAINDER_upper
 		sub $t0, $t0, $s1      # REMAINDER_upper = REMAINDER_upper - DIVISOR
 		
 		# IF REMAINDER_upper >=0 then branch
