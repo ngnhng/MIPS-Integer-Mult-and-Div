@@ -77,20 +77,20 @@ main:
 	
 	
 	#call operations
-	beq $t0, 0, goto_mul       # if 0 then multiply 
-	beq $t0, 1, goto_div       # else if 1 divide
+	beq $t0, 1, goto_mul       # if 0 then multiply 
+	beq $t0, 0, goto_div       # else if 1 divide
 	
 goto_mul: 
 	
-	jal _mul             # return a1 (lo) and a2(hi)
+	jal _mult             # return a1 (lo) and a2(hi)
 	
-	lw $s1, 4($sp)      # load and free stack
+	lw $s1, 4($sp)       # load and free stack
 	lw $s2, 0($sp)
 	addi $sp, $sp, 8
 	
 	la $a0, ($s1)
 	la $a3, ($s2)		     
-	jal negate           
+	jal negate_mul           
 	
 	jal print_mul_result
 	
@@ -100,13 +100,13 @@ goto_div:
 	
 	jal _div             # return a1 (quotient) and a2(remainder)	
 	
-	lw $s1, 4($sp)      # load and free stack
+	lw $s1, 4($sp)       # load and free stack
 	lw $s2, 0($sp)
 	addi $sp, $sp, 8
 	
 	la $a0, ($s1)
 	la $a3, ($s2)		 
-	jal negate       # negate according to saved signs
+	jal negate_div           # negate according to saved signs
 	
 	jal print_div_result
 	
@@ -114,7 +114,7 @@ main_exit:
 	li $v0, 10
 	syscall
 	
-####################################################################################################################################	
+#====================================================================================================
 user_input:
 	
 	print_string("Operand 1:\t")
@@ -128,25 +128,26 @@ user_input:
 	
 		li $v0, 8		#get op character
 		la $a0, input_buffer
-		li $a1, 2            # one for char and one for \0
+		li $a1, 2            # one for char and one for \000
 		syscall		
 		endl
+		
 		la $t3, input_buffer # load buffer		
-		lb $t3, 0($t3)       # get the ascii code
+		lb $t3, 0($t3)       # ascii code
 	
 		#branching
 		beq $t3, 0x2A, code_mul       #42 ascii
 		beq $t3, 0x2F, code_div       #47 ascii
 	
-		#print bad character string
+		# if not valid operator
 		print_string("Please enter '*' or '/'\n")
 		j get_oper8       # retry
 	
 	code_mul:
-		li $t1, 0
+		li $t1, 1
 		j valid_oper8
 	code_div:
-		li $t1, 1
+		li $t1, 0
 		j valid_oper8
 	
 	valid_oper8:
@@ -154,7 +155,7 @@ user_input:
 		print_string("Operand 2:\t")
 		li $v0, 5		#get op2
 		syscall
-		beq $v0, 0, div_by_0
+		beq $v0, $t1, div_by_0
 		move $t2, $v0		#store op2 in $t0
 
 		#store return values
@@ -174,25 +175,25 @@ user_input:
 		print_string("Please enter another divisor!\n\n")
 		j valid_oper8
 
-####################################################################################################################################
-_mul:  
+#====================================================================================================
+_mult:  
 	# THE PRODUCT AND MULTIPLICAND MAY OVERFLOW DUE TO SHIFTING LEFT
 	# Solution:
 		# USE TWO 32-BIT REGISTERS FOR HI AND LO, SIMILAR TO THE BASE MULT, MULTU INSTRUCTIONS.
 		# DEFINE A SUBROUTINE TO DISPLAY THE RESULT FROM BOTH HI AND LO REGS COMBINED.
 		
    	# if 0 occurs then quick exit
-   	beq $a0, $zero, mul_exit     # MULTIPLICAND
-    	beq $a1, $zero, mul_exit     # MULTIPLIER
+   	beq $a0, $zero, by_zero     # MULTIPLICAND
+    	beq $a1, $zero, by_zero      # MULTIPLIER
     	
     	li $s0, 0        # lo reg of PRODUCT
    	li $s1, 0        # hi reg of PRODUCT
     	li $s2, 0        # multiplicand expansion
 
-	mul_loop:
+	mult_loop:
 		# check even/oddness of MULTIPLIER
 		andi $t0, $a1, 1      # get LSB
-		beq $t0, 0, mul_cont  # if EVEN then branch
+		beq $t0, 0, mult_cont  # if EVEN then branch
 		
 		# ELSE
 		addu $s0, $s0, $a0    # PROD = PROD + MULTIPLICAND
@@ -202,7 +203,7 @@ _mul:
 		addu $s1, $s1, $t0    # push carry to upper of PRODUCT
 		addu $s1, $s1, $s2    # also add upper MULTIPLICAND
 		
-		mul_cont:
+		mult_cont:
 			# shift left MULTIPLICAND
 			andi $t0, $a0, 0x80000000    # get MSB
 			srl $t0, $t0, 31
@@ -212,16 +213,16 @@ _mul:
 			
 			#shift right MULTIPLIER
 			srl $a1, $a1, 1
-			beq $a1, $zero, mul_exit    # if MULTIPLIER == 0 then break
-			j mul_loop
+			beq $a1, $zero, mult_exit    # if MULTIPLIER == 0 then break
+			j mult_loop
 			
-	mul_exit:
+	mult_exit:
 		la $a1, ($s0)	#lo
 		la $a2, ($s1) #hi
 		
 		jr $ra
     	
-###################################################################################################################################
+#====================================================================================================
 _div:  
 	# || REMAINDER | QUOTIENT ||  --> || REMAINDER_upper | REMAINDER_lower||
        # Remainder and Quotient constitute two halves of a 64-bit register
@@ -229,7 +230,8 @@ _div:
        	# USE TWO 32-BIT REGISTERS
        	# DEFINE A METHOD FOR SHIFTING BETWEEN TWO REGS
         
-       beq $a1, $zero, div_by_0 
+       beq $a1, $zero, by_zero  # Quick Exit - Not Included in the Algorithm
+       
 	la $s0, ($a0)   # REMAINDER_lower = DIVIDEND
 	la $s1, ($a1)	  # DIVISOR
 	li $s2, 0       # COUNTER
@@ -247,7 +249,7 @@ _div:
 	
 		bge $s2, 32, div_exit  # loop 32 times for 32-bit division
 		
-		la $t0, ($s3)          # t0 = REMAINDER_upper  -> LOAD INSTEAD OF RESTORING REMAINDER_upper
+		la $t0, ($s3)          # t0 = REMAINDER_upper  -> LOAD TO RESTORE REMAINDER_upper
 		sub $t0, $t0, $s1      # REMAINDER_upper = REMAINDER_upper - DIVISOR
 		
 		# IF REMAINDER_upper >=0 then branch
@@ -263,7 +265,7 @@ _div:
 		
 		j cont
 		
-	sll_rem:
+	sll_rem:  
 	
 		la $s3, ($t0)
 		
@@ -288,9 +290,29 @@ _div:
 		srl $a2, $a2, 1  # final shift right
 		
 		jr $ra
+		
+#===================================================================================================	
+by_zero:	
+	li $a1, 0   # lo / quo
+	la $a2, 0   # hi / rem
+	jr $ra
+	     
+#====================================================================================================
+negate_mul:
 	
-###################################################################################################################################
-negate:
+	sub $t0, $a0, $a3
+	beq $t0, 0, negate_mul_exit    # skip if sign are similar
+	
+	subu $a1, $zero, $a1    # else negate
+	subu $a2, $zero, $a2
+	
+negate_mul_exit:
+	
+	li $t0, 0    # clear temp
+	jr $ra
+
+#====================================================================================================
+negate_div:
 	  # 4 cases : 0-1, 1-0, 1-1 and 0-0 ; the negation varies with each cases
 	sub $t0, $a0, $a3
 	beq $t0, 0, both    # 1-1 and 0-0
@@ -314,15 +336,19 @@ both:
 	
 negate_exit:	
 	
+	li $t0, 0
+	li $t1, 0
+	
 	jr $ra
-###################################################################################################################################
+#====================================================================================================
 print_mul_result:
 
 	la $t0, ($a1)
 	la $t1, ($a2)
 	
 	print_string("Choose display mode (D/H/B): ")
-	li $v0, 8		#get op character
+	
+	li $v0, 8		# read string to buffer
 	la $a0, input_buffer
 	li $a1, 2            # one for char and one for \0
 	syscall		
@@ -361,14 +387,14 @@ print_mul_result:
 		jr $ra
 	
 	
-###################################################################################################################################
+#====================================================================================================
 print_div_result:
 	
 	la $t0, ($a1)
 	la $t1, ($a2)
 	
 	print_string("Choose display mode (D/H/B): ")
-	li $v0, 8		#get op character
+	li $v0, 8		# read string to buffer
 	la $a0, input_buffer
 	li $a1, 2            # one for char and one for \0
 	syscall		
@@ -405,4 +431,5 @@ print_div_result:
 		print_bin($t1)
 		
 		jr $ra
-###################################################################################################################################
+#====================================================================================================
+#### END OF FILE ####
